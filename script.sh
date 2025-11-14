@@ -1,92 +1,80 @@
-#!/bin/bash
-# ============================================
-# go.sh — Script principal do projeto SGM
-# ============================================
-# 1) Criação do ambiente Conda (Pratica3)
-# 2) Criação da estrutura de diretórios
-# 3) Instalação do Prokka (via Conda)
-# 4) Download do ficheiro genómico (.fna.gz)
-# ============================================
-
+]#!/bin/bash
 set -e
-ENV_NAME="Pratica3"
 
-echo "=========================================="
-echo "[1/4] Criação do ambiente Conda"
-echo "=========================================="
+# ============================================
+# go.sh — Script do Exercício 1
+# Automatiza:
+# 1) Criação do ambiente Conda
+# 2) Instalação do Prokka
+# 3) Criação da estrutura de diretórios
+# 4) Download do genoma (FASTA)
+# 5) Execução do Prokka
+# 6) Guarda todos os comandos num ficheiro
+# ============================================
 
-# Verificar se conda está instalado
-if ! command -v conda &> /dev/null; then
-    echo "Conda não encontrado. Instala Miniconda ou Anaconda e tenta novamente."
-    exit 1
-fi
+# Nome do ambiente
+ENV_NAME="prokka_env"
 
-# Ativar o hook do conda
-eval "$($(conda info --base)/bin/conda shell.bash hook)"
+# URL e ficheiro do genoma
+URL="https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/005/845/GCF_000005845.2_ASM584v2/GCF_000005845.2_ASM584v2_genomic.fna.gz"
+FILENAME="GCF_000005845.2_ASM584v2_genomic.fna.gz"
 
-# Remover ambiente antigo (se existir)
-if conda info --envs | grep -q "^$ENV_NAME"; then
-    echo "Ambiente '$ENV_NAME' já existe. A remover..."
-    conda env remove -n "$ENV_NAME" -y
-fi
+# Criar ficheiro de log dos comandos
+LOGFILE="comandos_executados.txt"
+echo "# Lista de comandos executados" > $LOGFILE
 
-# Criar novo ambiente com Prokka e wget
-echo "A criar o ambiente '$ENV_NAME'..."
-conda create -n "$ENV_NAME" -c bioconda -c conda-forge prokka wget -y
-echo "Ambiente '$ENV_NAME' criado com sucesso!"
+log() {
+    echo "$1" | tee -a $LOGFILE
+}
 
-# Ativar o ambiente
-conda activate "$ENV_NAME"
+# ============================================
+# 1. Criar o ambiente Conda
+# ============================================
+log "conda create -y -n $ENV_NAME prokka=1.14.6 perl=5.26 bioperl=1.7.2"
+conda create -y -n $ENV_NAME prokka=1.14.6 perl=5.26 bioperl=1.7.2
 
-echo ""
-echo "=========================================="
-echo "[2/4] Criação da estrutura de diretórios"
-echo "=========================================="
+log "conda activate $ENV_NAME"
+source ~/anaconda3/etc/profile.d/conda.sh
+conda activate $ENV_NAME
 
-mkdir -p projeto/{raw_data,cleaned_data,annotation_results}
-echo "Estrutura criada:"
-find projeto -type d
+# ============================================
+# 2. Criar diretórios do projeto
+# ============================================
+log "mkdir -p projeto/raw"
+log "mkdir -p projeto/annotation_results"
+mkdir -p projeto/raw
+mkdir -p projeto/annotation_results
 
+# ============================================
+# 3. Download do genoma
+# ============================================
+log "cd projeto/raw"
+cd projeto/raw
 
-echo ""
-echo "=========================================="
-echo "[3/4] Instalação do Prokka"
-echo "=========================================="
+log "wget $URL"
+wget $URL
 
-if command -v prokka &> /dev/null; then
-    echo "Prokka instalado corretamente."
-else
-    echo "Erro: Prokka não foi encontrado no ambiente."
-    exit 1
-fi
+# ============================================
+# 4. Descomprimir o ficheiro FASTA
+# ============================================
+log "gunzip -k $FILENAME"
+gunzip -k $FILENAME
 
-prokka --version
+# Nome do ficheiro descomprimido
+FASTA="${FILENAME%.gz}"
 
-echo ""
-echo "=========================================="
-echo "[4/4] Download do ficheiro genómico"
-echo "=========================================="
+# ============================================
+# 5. Executar o Prokka
+# ============================================
+log "cd ../annotation_results"
+cd ../annotation_results
 
-cd projeto/raw_data
-GENOME_URL="https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/005/845/GCF_000005845.2_ASM584v2/GCF_000005845.2_ASM584v2_genomic.fna.gz"
+log "prokka ../raw/$FASTA --outdir ecoli_annotation --prefix ecoli"
+prokka ../raw/$FASTA --outdir ecoli_annotation --prefix ecoli
 
-echo "A descarregar ficheiro genómico..."
-wget -N "$GENOME_URL"
-
-echo "A descomprimir o ficheiro..."
-gunzip -f GCF_000005845.2_ASM584v2_genomic.fna.gz
-
-
-echo "executar o prokka"
-prokka GCF_000005845.2_ASM584v2_genomic.fna \
-  --outdir ../annotation_results \
-  --prefix ecoli \
-  --cpus 2
-
-
-echo "Genoma disponível em: $(pwd)/GCF_000005845.2_ASM584v2_genomic.fna"
-
-echo ""
-echo "=========================================="
-echo " Script concluído com sucesso!"
-echo "=========================================="
+# ============================================
+# Fim
+# ============================================
+log "# Execução concluída com sucesso!"
+echo "✔ Script terminado sem erros!"
+echo "✔ Os comandos usados estão guardados em: $LOGFILE"
