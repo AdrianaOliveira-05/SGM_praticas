@@ -1,92 +1,95 @@
 #!/bin/bash
 # ============================================
-# go.sh — Exercício 1: Anotação Automatizada
-# ============================================
-# Este script:
-#  1) Cria/usa um ambiente Conda a partir de environment.yml
-#  2) Activa o ambiente (prokka disponível)
-#  3) Cria a estrutura de diretórios do projecto
-#  4) Faz download do genoma E. coli (formato FASTA .fna.gz)
-#  5) Descomprime o ficheiro FASTA
-#  6) Executa o Prokka para anotação
-#  7) Guarda todos os comandos executados em comandos_executados.txt
+# Exercício 1 — Anotação Automatizada de um Genoma Bacteriano
+#
+# Este script faz:
+#  1) Inicializa o Conda e cria o ambiente prokka_env (a partir de environment.yml)
+#  2) Cria uma pasta para o exercício
+#  3) Faz o download do genoma em formato FASTA (.fna.gz) com wget
+#  4) Descomprime o ficheiro (.fna.gz -> .fna)
+#  5) Executa o Prokka para anotar o genoma
 # ============================================
 
 set -e
 
-# Nome do ambiente (deve ser o mesmo que está em environment.yml)
+# Nome do ambiente (tem de coincidir com o environment.yml)
 ENV_NAME="prokka_env"
 
-# URL e ficheiro do genoma
+# Pasta do exercício (Passo 1 da folha)
+EXERCISE_DIR="exercicio_prokka"
+
+# URL e nome do ficheiro do genoma montado
 GENOME_URL="https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/005/845/GCF_000005845.2_ASM584v2/GCF_000005845.2_ASM584v2_genomic.fna.gz"
-GENOME_FILE="GCF_000005845.2_ASM584v2_genomic.fna.gz"
+GENOME_GZ="GCF_000005845.2_ASM584v2_genomic.fna.gz"
 
-# Ficheiro onde vamos guardar todos os comandos
-LOGFILE="comandos_executados.txt"
-echo "# Lista de comandos executados" > "$LOGFILE"
+echo "====================================="
+echo "1) Inicializar Conda"
+echo "====================================="
 
-log() {
-    echo "$1" | tee -a "$LOGFILE"
-}
+# Tenta encontrar o conda.sh em locais típicos da VM
+if [ -f "$HOME/miniconda3/etc/profile.d/conda.sh" ]; then
+    source "$HOME/miniconda3/etc/profile.d/conda.sh"
+elif [ -f "$HOME/anaconda3/etc/profile.d/conda.sh" ]; then
+    source "$HOME/anaconda3/etc/profile.d/conda.sh"
+elif [ -f "/opt/miniconda3/etc/profile.d/conda.sh" ]; then
+    source "/opt/miniconda3/etc/profile.d/conda.sh"
+else
+    echo "❌ Não encontrei o ficheiro conda.sh."
+    echo "   Verifica onde está instalado o Conda e ajusta o caminho no script."
+    exit 1
+fi
 
-# ============================================
-# 1. Inicializar o conda no shell actual
-# ============================================
-log 'eval "$(conda shell.bash hook)"'
-eval "$(conda shell.bash hook)"
+echo "====================================="
+echo "2) Criar ambiente Conda (se necessário)"
+echo "====================================="
 
-# ============================================
-# 2. Criar o ambiente Conda a partir do environment.yml (se ainda não existir)
-# ============================================
-if ! conda env list | grep -q "$ENV_NAME"; then
-    log "conda env create -f environment.yml"
+# Cria o ambiente a partir do environment.yml se ainda não existir
+if ! conda env list | grep -q " $ENV_NAME"; then
+    echo "-> A criar ambiente $ENV_NAME a partir de environment.yml..."
     conda env create -f environment.yml
+else
+    echo "-> Ambiente $ENV_NAME já existe, a reutilizar."
 fi
 
 # Activar o ambiente
-log "conda activate $ENV_NAME"
+echo "-> Ativar ambiente $ENV_NAME"
 conda activate "$ENV_NAME"
 
-# ============================================
-# 3. Criar a estrutura de diretórios
-# ============================================
-log "mkdir -p projeto/raw"
-mkdir -p projeto/raw
+echo "====================================="
+echo "3) Criar pasta para o exercício"
+echo "====================================="
 
-log "mkdir -p projeto/annotation_results"
-mkdir -p projeto/annotation_results
+mkdir -p "$EXERCISE_DIR"
+cd "$EXERCISE_DIR"
 
-# ============================================
-# 4. Download do genoma (ficheiro FASTA .fna.gz)
-# ============================================
-log "cd projeto/raw"
-cd projeto/raw
+echo "Diretório do exercício: $(pwd)"
 
-log "wget $GENOME_URL"
+echo "====================================="
+echo "4) Download do genoma (wget)"
+echo "====================================="
+
+# Passo 1.2 da folha: download do genoma em formato FASTA
 wget "$GENOME_URL"
 
-# ============================================
-# 5. Descomprimir o ficheiro FASTA
-# ============================================
-log "gunzip -k $GENOME_FILE"
-gunzip -k "$GENOME_FILE"
+echo "Ficheiro descarregado: $GENOME_GZ"
 
-# Nome do ficheiro descomprimido (.fna)
-FASTA_FILE="${GENOME_FILE%.gz}"
+echo "====================================="
+echo "5) Descomprimir o ficheiro FASTA"
+echo "====================================="
 
-# ============================================
-# 6. Executar o Prokka para anotação
-# ============================================
-log "cd ../annotation_results"
-cd ../annotation_results
+gunzip -k "$GENOME_GZ"
 
-log "prokka ../raw/$FASTA_FILE --outdir ecoli_annotation --prefix ecoli"
-prokka ../raw/"$FASTA_FILE" --outdir ecoli_annotation --prefix ecoli
+GENOME_FNA="${GENOME_GZ%.gz}"
+echo "Ficheiro FASTA descomprimido: $GENOME_FNA"
 
-# ============================================
-# 7. Fim
-# ============================================
-log "# Execução concluída com sucesso"
-echo "✔ Script terminado sem erros."
-echo "✔ Comandos usados: $(pwd)/$LOGFILE"
+echo "====================================="
+echo "6) Executar o Prokka"
+echo "====================================="
+
+# O Prokka vai criar automaticamente a pasta de saída
+prokka "$GENOME_FNA" --outdir anotacao_ecoli --prefix ecoli
+
+echo "====================================="
+echo "✔ Terminado!"
+echo "Resultados da anotação em: $(pwd)/anotacao_ecoli"
 
